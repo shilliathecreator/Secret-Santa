@@ -1,5 +1,28 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { AnimatePresence } from "motion/react";
+import { MotionScene } from "@/components/motion/scene";
+import {
+  AnimatedButton,
+  AnimatedHeader,
+  Ambient,
+  HeroTitle,
+  Participant,
+  SoftPanel,
+  Toast,
+  FooterStar,
+} from "@/components/motion/primitives";
+import { GiftArt } from "@/components/motion/gift-art";
+import { AnimatedSteps } from "@/components/motion/steps";
+const Shuffle = dynamic(
+  () => import("@/components/motion/room-effects").then((m) => m.Shuffle),
+  { ssr: false },
+);
+const Reveal = dynamic(
+  () => import("@/components/motion/room-effects").then((m) => m.Reveal),
+  { ssr: false, loading: () => <div className="reveal-loading" /> },
+);
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -18,7 +41,7 @@ import {
   ChevronRight,
   LoaderCircle,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { RoomPreview, LandingDetails } from "@/components/landing-details";
 type Room = {
   id: string;
@@ -30,17 +53,27 @@ type Room = {
   result: { nickname: string; note: string } | null;
 };
 export default function Home() {
+  return (
+    <MotionScene>
+      <HomeContent />
+    </MotionScene>
+  );
+}
+function HomeContent() {
   const [modal, setModal] = useState<"create" | "join" | null>(null),
     [room, setRoom] = useState<Room | null>(null),
     [busy, setBusy] = useState(false),
+    [drawing, setDrawing] = useState(false),
     [error, setError] = useState(""),
     [opened, setOpened] = useState(false),
     [copied, setCopied] = useState(false),
     [music, setMusic] = useState(false),
     [invite, setInvite] = useState("");
   const audioRef = useRef<AudioContext | null>(null);
+  const clientRef = useRef<SupabaseClient | null>(null);
   const modalTrigger = useRef<HTMLElement | null>(null);
   const load = useCallback(async (code: string) => {
+    const supabase = clientRef.current;
     if (!supabase) return;
     const { data, error } = await supabase.rpc("room_state", { p_code: code });
     if (error) throw error;
@@ -56,8 +89,11 @@ export default function Home() {
     }
   }, []);
   useEffect(() => {
-    if (!room || !supabase) return;
-    const client = supabase;
+    if (room?.id) void import("@/components/motion/room-effects");
+  }, [room?.id]);
+  useEffect(() => {
+    if (!room || !clientRef.current) return;
+    const client = clientRef.current;
     let active = true;
     const refresh = () => {
       load(room.code).catch((e) => {
@@ -149,16 +185,17 @@ export default function Home() {
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
-    if (!supabase) {
-      setError(
-        "Supabase bağlantısı henüz yapılandırılmadı. Kurulum için README dosyasındaki adımları izle.",
-      );
-      return;
-    }
-    const client = supabase;
     const form = new FormData(e.currentTarget);
     setBusy(true);
     try {
+      const { supabase: client } = await import("@/lib/supabase");
+      if (!client) {
+        setError(
+          "Supabase bağlantısı henüz yapılandırılmadı. Kurulum için README dosyasındaki adımları izle.",
+        );
+        return;
+      }
+      clientRef.current = client;
       const { data: session, error: sessionError } =
         await client.auth.getSession();
       if (sessionError) throw sessionError;
@@ -198,8 +235,10 @@ export default function Home() {
     }
   }
   async function draw() {
+    const supabase = clientRef.current;
     if (!supabase || !room) return;
     setBusy(true);
+    setDrawing(true);
     setError("");
     try {
       const { error } = await supabase.rpc("draw_room", { p_code: room.code });
@@ -209,6 +248,7 @@ export default function Home() {
       setError((e as { message: string }).message);
     } finally {
       setBusy(false);
+      setDrawing(false);
     }
   }
   async function copy() {
@@ -234,20 +274,8 @@ export default function Home() {
       <a className="skip-link" href="#sayfa-basligi">
         İçeriğe geç
       </a>
-      <div className="snow" aria-hidden="true">
-        {Array.from({ length: 28 }, (_, i) => (
-          <i
-            key={i}
-            style={{
-              left: `${(i * 37) % 100}%`,
-              animationDelay: `-${i * 0.9}s`,
-              animationDuration: `${9 + (i % 8)}s`,
-              opacity: 0.18 + (i % 4) * 0.12,
-            }}
-          />
-        ))}
-      </div>
-      <header>
+      <Ambient />
+      <AnimatedHeader>
         <a className="brand" href="/" aria-label="Bir Küçük Mucize ana sayfa">
           <span className="brand-icon">
             <Gift aria-hidden="true" size={22} />
@@ -279,9 +307,9 @@ export default function Home() {
             />
           </button>
         </nav>
-      </header>
+      </AnimatedHeader>
       {room ? (
-        <section className="room-panel">
+        <SoftPanel className="room-panel">
           <div className="eyebrow">
             <span /> SENİN KÜÇÜK YILBAŞI DÜNYAN
           </div>
@@ -302,7 +330,7 @@ export default function Home() {
               </div>
               <div className="members">
                 {room.members.map((m, i) => (
-                  <div key={m.id}>
+                  <Participant key={m.id}>
                     <span
                       aria-hidden="true"
                       className="avatar"
@@ -319,11 +347,15 @@ export default function Home() {
                     </span>
                     <strong>{m.nickname}</strong>
                     <Check aria-hidden="true" size={16} />
-                  </div>
+                  </Participant>
                 ))}
               </div>
               {!room.drawn && (
-                <button className="outline wide" onClick={copy}>
+                <AnimatedButton
+                  kind="outline"
+                  className="wide copy-button"
+                  onClick={copy}
+                >
                   {copied ? (
                     <Check aria-hidden="true" size={16} />
                   ) : (
@@ -332,7 +364,7 @@ export default function Home() {
                   {copied
                     ? "Bağlantı kopyalandı"
                     : "Davet bağlantısını kopyala"}
-                </button>
+                </AnimatedButton>
               )}
               <p className="fine">
                 Davet bağlantısı özeldir. Yalnızca arkadaşlarınla paylaş.
@@ -345,14 +377,20 @@ export default function Home() {
                   <button
                     className={`gift-box ${opened ? "unwrapped" : ""}`}
                     onClick={() => setOpened(true)}
-                    aria-label="Gizli eşleşmeni aç"
+                    aria-label={
+                      opened
+                        ? "Eşleşmen açıldı"
+                        : "Dokun ve öğren: gizli eşleşmeni aç"
+                    }
+                    aria-expanded={opened}
                   >
                     <span className="gift-lid" aria-hidden="true" />
                     <span className="gift-body" aria-hidden="true" />
                     <span className="bow" aria-hidden="true" />
                   </button>
+                  {!opened && <span className="tap-hint">Dokun ve öğren</span>}
                   {opened && room.result ? (
-                    <div className="reveal" role="status">
+                    <Reveal>
                       <p>Bu yıl gülümseteceğin kişi</p>
                       <h2>{room.result.nickname}</h2>
                       <blockquote>
@@ -362,7 +400,7 @@ export default function Home() {
                         <LockKeyhole aria-hidden="true" size={12} /> Bu sonucu
                         yalnızca sen görebilirsin.
                       </span>
-                    </div>
+                    </Reveal>
                   ) : (
                     <>
                       <h2>Bir sır seni bekliyor!</h2>
@@ -374,9 +412,13 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  <div className="waiting-icon">
-                    <Gift aria-hidden="true" size={45} />
-                  </div>
+                  {drawing ? (
+                    <Shuffle />
+                  ) : (
+                    <div className="waiting-icon">
+                      <Gift aria-hidden="true" size={45} />
+                    </div>
+                  )}
                   <h2>Biraz heyecan, biraz sabır.</h2>
                   <p>
                     En az iki kişiyle kura çekilebilir. Kura çekildikten sonra
@@ -423,7 +465,7 @@ export default function Home() {
               {error}
             </p>
           )}
-        </section>
+        </SoftPanel>
       ) : (
         <>
           <section className="hero">
@@ -431,18 +473,7 @@ export default function Home() {
               <div className="eyebrow">
                 <span /> YILIN EN TATLI SIRRI
               </div>
-              <h1 id="sayfa-basligi" tabIndex={-1}>
-                Küçük bir hediye.
-                <br />
-                Kocaman bir{" "}
-                <span className="magic">
-                  mutluluk
-                  <svg viewBox="0 0 390 20" aria-hidden="true">
-                    <path d="M4 12Q180 0 383 10M18 18Q180 8 361 15" />
-                  </svg>
-                </span>
-                <span className="red">.</span>
-              </h1>
+              <HeroTitle />
               <p className="subtitle">
                 Ücretsiz, kısa bir başlangıç: odanı kur, davet bağlantını
                 paylaş.
@@ -450,110 +481,28 @@ export default function Home() {
                 hediye arkadaşını keşfetsin.
               </p>
               <div className="hero-actions">
-                <button className="primary" onClick={() => open("create")}>
+                <AnimatedButton onClick={() => open("create")}>
                   <Gift aria-hidden="true" size={19} /> Bir oda oluştur{" "}
-                  <ArrowUpRight aria-hidden="true" size={18} />
-                </button>
-                <button className="outline" onClick={() => open("join")}>
-                  Odaya katıl <ArrowRight aria-hidden="true" size={18} />
-                </button>
+                  <ArrowUpRight
+                    aria-hidden="true"
+                    size={18}
+                    className="cta-arrow"
+                  />
+                </AnimatedButton>
+                <AnimatedButton kind="outline" onClick={() => open("join")}>
+                  Odaya katıl{" "}
+                  <ArrowRight
+                    aria-hidden="true"
+                    size={18}
+                    className="cta-arrow"
+                  />
+                </AnimatedButton>
               </div>
             </div>
-            <div className="hero-art" aria-hidden="true">
-              <div className="art-orbit" />
-              <Sparkles aria-hidden="true" className="art-star star-one" />
-              <Sparkles aria-hidden="true" className="art-star star-two" />
-              <Sparkles aria-hidden="true" className="art-star star-three" />
-              <Sparkles aria-hidden="true" className="tiny-star" />
-              <div className="moon" />
-              <div className="tree tree-back">
-                <i />
-                <i />
-                <i />
-                <b />
-              </div>
-              <div className="tree tree-front">
-                <i />
-                <i />
-                <i />
-                <b />
-              </div>
-              <div className="ground" />
-              <div className="present present-green">
-                <span />
-                <i />
-                <b />
-              </div>
-              <div className="present present-red">
-                <span />
-                <i />
-                <b />
-              </div>
-              <div className="present present-gold">
-                <span />
-                <i />
-                <b />
-              </div>
-              <div className="ornament" />
-              <span className="art-dot dot-one" />
-              <span className="art-dot dot-two" />
-            </div>
+            <GiftArt />
           </section>
           <RoomPreview />
-          <section id="nasil" className="how">
-            <div className="section-heading">
-              <div>
-                <span className="eyebrow">MUTLULUĞA GİDEN KISA YOL</span>
-                <h2>
-                  Üç adımda yılbaşı sihri<span className="red">.</span>
-                </h2>
-              </div>
-            </div>
-            <div className="steps">
-              <article>
-                <span className="step-icon green">
-                  <Users aria-hidden="true" size={23} />
-                </span>
-                <span aria-hidden="true" className="step-number">
-                  01
-                </span>
-                <h3>Kendi küçük dünyanı kur</h3>
-                <p>
-                  Arkadaşlarına özel bir oda oluştur.
-                  <br />
-                  Davet bağlantınla herkesi bir araya getir.
-                </p>
-              </article>
-              <article>
-                <span className="step-icon peach">
-                  <Heart aria-hidden="true" size={23} />
-                </span>
-                <span aria-hidden="true" className="step-number">
-                  02
-                </span>
-                <h3>Biraz kendinden bahset</h3>
-                <p>
-                  Takma adını seç, hediye notunu bırak.
-                  <br />
-                  Küçük ipuçları, büyük gülümsemeler.
-                </p>
-              </article>
-              <article>
-                <span className="step-icon gold">
-                  <Gift aria-hidden="true" size={23} />
-                </span>
-                <span aria-hidden="true" className="step-number">
-                  03
-                </span>
-                <h3>Sırrını keşfet, mutlu et</h3>
-                <p>
-                  Kura çekilsin, hediye arkadaşın belli olsun.
-                  <br />
-                  Kimin kime çıktığı sadece ona özel.
-                </p>
-              </article>
-            </div>
-          </section>
+          <AnimatedSteps />
           <LandingDetails />
         </>
       )}
@@ -562,110 +511,119 @@ export default function Home() {
           bir küçük <em>mucize.</em>
         </a>
         <span>
-          Sevgiyle hazırlandı. Paylaştıkça çoğalsın.{" "}
-          <Heart aria-hidden="true" size={12} />
+          Sevgiyle hazırlandı. Paylaştıkça çoğalsın. <FooterStar />
         </span>
       </footer>
-      {modal && (
-        <div
-          className="overlay"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !busy) setModal(null);
-          }}
-        >
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-title"
+      <Toast show={copied} />
+      <AnimatePresence>
+        {modal && (
+          <SoftPanel
+            className="overlay"
+            instantExit
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !busy) setModal(null);
+            }}
           >
-            <button
-              className="close"
-              aria-label="Kapat"
-              onClick={() => setModal(null)}
-              disabled={busy}
+            <section
+              className="modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="modal-title"
             >
-              <X aria-hidden="true" size={21} />
-            </button>
-            <span className="modal-icon">
-              <Gift aria-hidden="true" size={28} />
-            </span>
-            <span className="eyebrow">KÜÇÜK BİR BAŞLANGIÇ</span>
-            <h2 id="modal-title">
-              {modal === "create" ? "Mutluluğa bir oda aç." : "Ekibine katıl."}
-            </h2>
-            <p>Sihir, bir araya geldiğimizde başlar.</p>
-            <form onSubmit={submit}>
-              {modal === "create" ? (
+              <button
+                className="close"
+                aria-label="Kapat"
+                onClick={() => setModal(null)}
+                disabled={busy}
+              >
+                <X aria-hidden="true" size={21} />
+              </button>
+              <span className="modal-icon">
+                <Gift aria-hidden="true" size={28} />
+              </span>
+              <span className="eyebrow">KÜÇÜK BİR BAŞLANGIÇ</span>
+              <h2 id="modal-title">
+                {modal === "create"
+                  ? "Mutluluğa bir oda aç."
+                  : "Ekibine katıl."}
+              </h2>
+              <p>Sihir, bir araya geldiğimizde başlar.</p>
+              <form onSubmit={submit}>
+                {modal === "create" ? (
+                  <label>
+                    Odanın adı
+                    <input
+                      autoFocus
+                      name="name"
+                      required
+                      minLength={2}
+                      maxLength={60}
+                      autoComplete="off"
+                    />
+                  </label>
+                ) : (
+                  <label>
+                    Davet kodu
+                    <input
+                      autoFocus
+                      name="code"
+                      defaultValue={invite}
+                      required
+                      pattern="[a-fA-F0-9]{24}"
+                      title="Davet bağlantısındaki 24 karakterlik kod"
+                      autoComplete="off"
+                    />
+                  </label>
+                )}
                 <label>
-                  Odanın adı
+                  Takma adın
                   <input
-                    autoFocus
-                    name="name"
+                    name="nickname"
                     required
                     minLength={2}
-                    maxLength={60}
-                    autoComplete="off"
+                    maxLength={30}
+                    autoComplete="nickname"
                   />
                 </label>
-              ) : (
                 <label>
-                  Davet kodu
-                  <input
-                    autoFocus
-                    name="code"
-                    defaultValue={invite}
-                    required
-                    pattern="[a-fA-F0-9]{24}"
-                    title="Davet bağlantısındaki 24 karakterlik kod"
-                    autoComplete="off"
-                  />
+                  Hediye notun <span>(isteğe bağlı)</span>
+                  <textarea name="note" maxLength={500} rows={3} />
                 </label>
-              )}
-              <label>
-                Takma adın
-                <input
-                  name="nickname"
-                  required
-                  minLength={2}
-                  maxLength={30}
-                  autoComplete="nickname"
-                />
-              </label>
-              <label>
-                Hediye notun <span>(isteğe bağlı)</span>
-                <textarea name="note" maxLength={500} rows={3} />
-              </label>
-              <p className="fine">
-                Sevdiğin şeyler, küçük dileklerin… Notunu sadece sana hediye
-                alacak kişi görür.
-              </p>
-              {error && (
-                <p className="error" role="alert">
-                  {error}
+                <p className="fine">
+                  Sevdiğin şeyler, küçük dileklerin… Notunu sadece sana hediye
+                  alacak kişi görür.
                 </p>
-              )}
-              <button className="primary wide" disabled={busy}>
-                {busy ? (
-                  <LoaderCircle aria-hidden="true" className="spin" size={18} />
-                ) : (
-                  <Sparkles aria-hidden="true" size={18} />
-                )}{" "}
-                {busy
-                  ? "Biraz sihir hazırlanıyor…"
-                  : modal === "create"
-                    ? "Odamı oluştur"
-                    : "Odaya katıl"}
-                <ChevronRight aria-hidden="true" size={18} />
-              </button>
-              <p className="fine">
-                Oturumun bu tarayıcıda saklanır. Odaya dönebilmek için tarayıcı
-                verilerini silme.
-              </p>
-            </form>
-          </section>
-        </div>
-      )}
+                {error && (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <button className="primary wide" disabled={busy}>
+                  {busy ? (
+                    <LoaderCircle
+                      aria-hidden="true"
+                      className="spin"
+                      size={18}
+                    />
+                  ) : (
+                    <Sparkles aria-hidden="true" size={18} />
+                  )}{" "}
+                  {busy
+                    ? "Biraz sihir hazırlanıyor…"
+                    : modal === "create"
+                      ? "Odamı oluştur"
+                      : "Odaya katıl"}
+                  <ChevronRight aria-hidden="true" size={18} />
+                </button>
+                <p className="fine">
+                  Oturumun bu tarayıcıda saklanır. Odaya dönebilmek için
+                  tarayıcı verilerini silme.
+                </p>
+              </form>
+            </section>
+          </SoftPanel>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

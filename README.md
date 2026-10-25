@@ -65,3 +65,19 @@ Supabase projesi sağlanmadan canlı veritabanı, Auth ve Realtime kontrolleri y
 Canonical ve Open Graph origin varsayılanı `https://secretsanta-beta.vercel.app` adresidir. Farklı bir yayında `NEXT_PUBLIC_SITE_URL` değişkenini tam HTTPS origin olarak tanımlayıp yeniden derle. Davet kodları canonical veya paylaşım görseline eklenmez. `app/opengraph-image.tsx`, Next.js ile derleme sırasında 1200×630 PNG üretir; hem Open Graph hem Twitter büyük kartı bu görseli kullanır. `app/icon.svg` favicon olarak sunulur, belge dili `tr` olarak ayarlıdır.
 
 Ana sayfadaki oda önizlemesi etiketli bir HTML/CSS örneğidir; gerçek kullanıcı veya canlı oda verisi değildir. Gösterilen özellikler hediye notu, özel davet bağlantısı ve gizli kuradır. Bütçe, özel eşleşme hariç tutma kuralı ve ayrı istek listesi mevcut değildir. Veriler için otomatik silme süresi yoktur. Oda sahibi diğer sonuçlara erişemez; iki kişilik odada karşı sonuç çıkarılabilir. Veritabanı yöneticisinin teknik erişimi vardır. SSS ve gizlilik bölümü bu sınırları açıkça belirtir.
+
+## Hareket ve illüstrasyon katmanı
+
+Tek yeni uygulama bağımlılığı `motion` paketidir (Framer Motion). `components/motion/scene.tsx`, MotionConfig/LazyMotion üzerinden azaltılmış hareket tercihini, ince imleç desteğini ve sekme görünürlüğünü merkezi yönetir. İşletim sistemi tercihi sayfa açıkken değiştirilirse de uygulanır. İlk sunucu çıktısı okunabilir kalır; JavaScript olmadan içerik kaybolmaz.
+
+- `primitives.tsx`: maskeli başlık, spring/manyetik CTA, scroll ile belirginleşen navbar, katılımcı girişi, yumuşak paneller, kopyalama toast'u ve SVG footer yıldızı.
+- `gift-art.tsx`: inline, hafif düzensiz SVG hediye çizimi; CSS kontur/fill girişi, hover/dokunma ile Motion kapak açılışı ve yıldız/kalp parçacıkları.
+- `steps.tsx` + `sketches.tsx`: useInView ile sıralı adımlar, useScroll/pathLength bağlantısı, görünürken lazy yüklenen ev/not/kura/zarf illüstrasyonları.
+- `room-effects.tsx`: yalnızca oda akışında lazy yüklenen karıştırma ve gizli sonuç kartı. Sonuç metni kullanıcı açmadan DOM'a eklenmez.
+- `features.ts`: asenkron yüklenen hafif domAnimation özellik paketi; drag, Three.js ve scroll-jacking yoktur.
+
+Kar katmanında 12 öğe bulunur; sekme gizliyken CSS hareketleri durur. Mobilde manyetik hareket ve adımların bağlantı yolu kapalıdır, giriş mesafeleri azaltılır. Ana hareketler transform/opacity, çizim efektleri yalnızca SVG stroke üzerinden yürür. Lazy illüstrasyonlar sabit boyutlu yuvalara yerleşir. Supabase istemcisi ana sayfanın ilk yüklemesine dahil edilmez; ilk oda işleminde yüklenir. Veritabanı ve kura gizlilik mantığı değiştirilmemiştir.
+
+Yerel doğrulama: üretim derlemesi ve mevcut algoritma testleri geçti. Chromium'da 360/390/768/1440 px taşma, axe WCAG AA, klavye odağı, hareket tercihinin canlı değişimi, görünürlükte durdurma, SVG hediye etkileşimi ve lazy illüstrasyon yükleme kontrolleri geçti. Kontrollü API yanıtlarıyla anonim oturum, oda kurma, yeni katılımcının görünmesi, kopyalama toast'u, bekleyen kura ve yalnızca dokununca açılan sonuç/konfeti test edildi. Bu test canlı Supabase entegrasyonu olarak değerlendirilmez.
+
+Aynı ayarlarda ardışık yerel Lighthouse karşılaştırmasında önceki sürüm 95, yeni sürüm 98 performance puanı aldı; her ikisinde CLS 0. Başlangıç script transferi yaklaşık 205 KiB olarak kaldı (Supabase'in ertelenmesi Motion maliyetini dengeledi). Bunlar yerel laboratuvar ölçümleridir; Vercel yayını üzerinde ölçüm yapılmadı.

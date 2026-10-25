@@ -1,3 +1,4 @@
+import { LazySketch } from "./motion/steps";
 import {
   Gift,
   Link,
@@ -145,6 +146,7 @@ export function LandingDetails() {
         className="privacy-section content-section"
         aria-labelledby="privacy-title"
       >
+        <LazySketch kind="envelope" />
         <div className="section-heading">
           <div>
             <span className="eyebrow">
