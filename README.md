@@ -59,3 +59,9 @@ Canlı Supabase kabul kontrolü (proje yapılandırıldıktan sonra):
 7. Sayfayı yenile, aynı davet koduyla tekrar katıl; mevcut oturumun aynı sonucuna dönmeli.
 
 Supabase projesi sağlanmadan canlı veritabanı, Auth ve Realtime kontrolleri yapılmış sayılmaz.
+
+## Paylaşım ve içerik doğruluğu
+
+Canonical ve Open Graph origin varsayılanı `https://secretsanta-beta.vercel.app` adresidir. Farklı bir yayında `NEXT_PUBLIC_SITE_URL` değişkenini tam HTTPS origin olarak tanımlayıp yeniden derle. Davet kodları canonical veya paylaşım görseline eklenmez. `app/opengraph-image.tsx`, Next.js ile derleme sırasında 1200×630 PNG üretir; hem Open Graph hem Twitter büyük kartı bu görseli kullanır. `app/icon.svg` favicon olarak sunulur, belge dili `tr` olarak ayarlıdır.
+
+Ana sayfadaki oda önizlemesi etiketli bir HTML/CSS örneğidir; gerçek kullanıcı veya canlı oda verisi değildir. Gösterilen özellikler hediye notu, özel davet bağlantısı ve gizli kuradır. Bütçe, özel eşleşme hariç tutma kuralı ve ayrı istek listesi mevcut değildir. Veriler için otomatik silme süresi yoktur. Oda sahibi diğer sonuçlara erişemez; iki kişilik odada karşı sonuç çıkarılabilir. Veritabanı yöneticisinin teknik erişimi vardır. SSS ve gizlilik bölümü bu sınırları açıkça belirtir.
