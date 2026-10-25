@@ -1,0 +1,8 @@
+{
+  "rooms": {"id":"uuid primary key","code":"24-character cryptographic invitation secret; unique","name":"string (2–60)","owner_id":"auth.users.id","drawn":"boolean","created_at":"timestamptz"},
+  "users": {"storage":"Supabase Auth (anonymous sessions)","id":"uuid","profile":"room-scoped members"},
+  "members": {"room_id":"rooms.id; composite primary key","user_id":"auth.users.id; composite primary key","nickname":"string (2–30); unique per room","note":"string (max 500); private","joined_at":"timestamptz"},
+  "matches": {"room_id":"rooms.id","giver_id":"members.user_id; primary key with room_id","recipient_id":"members.user_id; unique per room; must differ from giver_id"},
+  "room_events":{"room_id":"rooms.id; primary key","version":"uuid; realtime notification without personal data"},
+  "access":{"direct_tables":"All private; only room_events selectable by members via RLS","room_state":"Members see nicknames and only their own recipient + recipient note","draw_room":"Owner only; atomic, serialized and cannot redraw"}
+}
